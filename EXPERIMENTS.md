@@ -1,0 +1,63 @@
+# 基础分类实验：为什么不能只看准确率
+
+这是在真实 DermaMNIST 64×64 上运行的教学对照；使用原官方分区，不能当作病灶独立或临床泛化验证。
+
+## 本次实际结果
+
+样本数：train=7007、val=1003、test=2005。Python 3.12.14，scikit-learn 1.9.1。
+选参仅使用val，按固定七类macro-F1在C=0.1、1、10中选择，实际选中C=10.0。模型仍只在train拟合，未合并train+val重训。
+
+| 分区 | 方法 | Accuracy | Balanced accuracy | Macro-F1 |
+|---|---|---:|---:|---:|
+| val | 始终猜多数类 | 0.6690 | 0.1429 | 0.1145 |
+| val | 平衡权重逻辑回归 | 0.5165 | 0.4940 | 0.3714 |
+| test | 始终猜多数类 | 0.6688 | 0.1429 | 0.1145 |
+| test | 平衡权重逻辑回归 | 0.5232 | 0.4865 | 0.3611 |
+
+多数类方法的准确率更高，但它不会识别其他六类。逻辑回归牺牲部分多数类正确率，使各类召回更均衡。三项指标需一起比较，不能简单宣称逻辑回归在所有意义上都更好。
+验证集用于选择参数，所以其最终分数不等于独立泛化估计。test仅在固定协议后显式评估；这次已查看test，后续不能再把它当成从未见过的独立数据来反复调参。
+
+## 特征、拟合与选择
+
+- RGB各通道均值3维、标准差3维；Pillow灰度均值和标准差2维，共8维，除以255归一化。标准差使用ddof=0。
+- 灰度直方图16维，固定区间[0,256)、每格宽16，计数除以像素总数；合计24维。
+- 每个C创建独立Pipeline，StandardScaler与逻辑回归仅fit train。class_weight=balanced也仅由train标签计算。
+- 候选参数按未四舍五入的val macro-F1比较；精确平局优先较小C。test不参与选择。
+- accuracy是总体正确比例；balanced accuracy是各真实类别召回率的平均；macro-F1是固定七类F1的平均，零除记0。官方三个分区均覆盖七类。
+
+## 数据审计与限制
+
+本次原始RGB精确像素审计：train内1个重复组、val内1个重复组，跨分区共享组为0，标签冲突组为0。
+单位是哈希分组，不是患者、病灶或图像对数。审计JSON保留组内分区、编号和标签，未自动删除样本。
+**跨分区没有完全相同像素，不代表没有数据泄漏。** 数据质量研究已报告同病灶不同照片跨越原分区；本实验未取得病灶身份映射，未修复该局限。色彩特征也受光照、背景与毛发影响，模型没有定位病灶。
+
+## 运行与阅读结果
+
+```bash
+.venv/bin/python -m pip install -r requirements-ml-lock.txt
+# 或 python3 bootstrap.py --ml
+.venv/bin/python train_baseline.py --offline
+# 确定协议后才显式开启测试集评估：
+.venv/bin/python train_baseline.py --offline --evaluate-test
+```
+
+默认输出outputs/baseline/validation/；显式test输出outputs/baseline/test_evaluation/。每次更新对应目录。
+先读results.md，再核对experiment.json、validation_candidates.csv、data_quality.json；各方法的predictions.csv、classification.csv和confusion.csv提供逐条证据。model_coefficients.csv记录标准化特征上的系数，完整标准化参数与截距保存在摘要中。
+图表包括方法对比、逻辑回归的计数/按真实类归一化混淆矩阵，以及按索引排序的前12个验证集错误。错误示例不代表所有错误的分布，不据此反向修改test协议。
+
+## 自己动手学习
+
+1. 不训练模型，手算：为什么全猜最多类别也能得到约67%的准确率？为什么balanced accuracy只有约1/7？
+2. 从val_logistic_classification.csv选择一个少数类别，用混淆矩阵核对support与recall。
+3. 解释StandardScaler为什么只fit train；在tests_ml/test_baseline.py查看对应测试。
+4. 查看一个错误案例：它是否可能受背景颜色影响？把观察写为假设，不直接断言病因。
+5. 下一步先取得可核对的病灶映射并设计分组评估，再考虑CNN或迁移学习，避免直接比较有泄漏和无泄漏划分的分数。
+
+## 参考资料
+
+- [scikit-learn Pipeline与防泄漏](https://scikit-learn.org/stable/common_pitfalls.html)
+- [LogisticRegression与类别权重](https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html)
+- [Balanced accuracy](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.balanced_accuracy_score.html)
+- [F1指标](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.f1_score.html)
+- [原数据质量研究](https://www.nature.com/articles/s41597-025-04382-5)
+- 数据引用与CC BY-NC 4.0许可见[DATA_SOURCE.md](DATA_SOURCE.md)。生成数据、模型结果和图片不上传到仓库。

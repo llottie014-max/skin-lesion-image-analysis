@@ -2,7 +2,7 @@
 
 基于 Python 的皮肤病变图像分析与可视化学习项目。
 
-A beginner-friendly Python project for descriptive analysis and visualization of DermaMNIST skin lesion images. No classifier is trained in the current version.
+A beginner-friendly Python project for DermaMNIST image analysis, with an optional reproducible classical machine learning baseline. No deep learning or clinical diagnosis.
 
 ## 功能
 
@@ -14,6 +14,8 @@ A beginner-friendly Python project for descriptive analysis and visualization of
 - 保存 300 dpi 图表和 JSON 运行摘要。
 
 项目通过 Python 脚本运行，结果保存为文件。
+
+**新增进阶实验：**24维可解释特征、精确像素重复审计、多数类对照与逻辑回归分类，按验证集选择参数。真实实验与局限见 [EXPERIMENTS.md](EXPERIMENTS.md)。
 
 ## 快速开始
 
@@ -47,6 +49,26 @@ python3 bootstrap.py          # 寻找已安装的3.12，配置项目环境
 macOS 也可双击 `配置环境.command` 和 `运行项目.command`；运行脚本会检查环境、保存终端日志并打开结果文件夹。
 
 配置工具不下载解释器或修改系统 Python。环境损坏时要求先改名保存；安装依赖需要网络。锁文件记录已测试版本，`requirements.txt` 列出允许的范围。
+
+## 进阶：基础分类实验
+
+原来的 main.py 保持独立；需要分类实验时再安装可选依赖：
+
+```bash
+.venv/bin/python -m pip install -r requirements-ml-lock.txt
+# 也可使用 python3 bootstrap.py --ml 自动配置
+.venv/bin/python train_baseline.py --offline
+```
+
+默认输出 `outputs/baseline/validation/`，包含数据质量审计、候选参数分数、两种方法的验证集预测与指标、混淆矩阵、错误示例和完整配置。**默认不计算测试集预测或指标**；但会读取三个分区做精确重复和标签冲突审计。
+
+确定特征和选参协议后，可以显式开启原官方测试集评估：
+
+```bash
+.venv/bin/python train_baseline.py --offline --evaluate-test
+```
+
+输出到独立的 `outputs/baseline/test_evaluation/`。缩放器和模型只在 train 拟合，用 val 的 macro-F1 在 C=0.1/1/10 中选参数；不合并 train+val 重训，不根据 test 再调参。原数据有已报告的同病灶跨分区局限，所有指标仅用于原官方分区的教学对照。
 
 ## 数据与输出
 
@@ -92,12 +114,14 @@ macOS 也可双击 `配置环境.command` 和 `运行项目.command`；运行脚
 
 测试使用小型人工数组，不自动下载数据；完整分析通过 main.py 在真实数据上运行。
 
+安装可选机器学习依赖后，再运行 `.venv/bin/python -m unittest discover -s tests_ml -v`。基础测试与可选实验测试分开，原分析项目不强制安装 scikit-learn。
+
 ## 来源与局限
 
 使用 [MedMNIST / DermaMNIST](https://github.com/MedMNIST/MedMNIST)，源数据为 HAM10000。数据许可为 **CC BY-NC 4.0**，引用见 [DATA_SOURCE.md](DATA_SOURCE.md)。仓库不包含原始数据或派生图片。
 
-类别是已有标签，不是程序预测；图像比例不是患者患病率。低分辨率、拍摄条件及已报告的同病灶跨划分问题限制后续建模解释。
+基础统计展示已有标签；分类实验将真实标签与模型预测分开保存。图像比例不是患者患病率。低分辨率、拍摄条件及已报告的同病灶跨划分问题限制模型结果的解释。
 
-当前仅完成描述性统计和图像处理，尚未训练深度学习模型。后续先核查病灶层面划分，再建立分类基线和开展对比实验。
+当前已完成图像分析和可选的逻辑回归教学基线，尚未训练深度学习模型。进一步研究前需取得病灶身份映射并使用合理的分组划分；像素哈希检查不能替代这一工作。
 
 项目在 AI 工具辅助下整理，面向边做边学。请真实运行、调试和独立修改，并遵守课程工具使用与引用要求。代码尚未指定开源许可证，数据许可与代码权利分开处理。

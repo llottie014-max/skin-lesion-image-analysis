@@ -15,7 +15,7 @@ def environment_python(root):
     return Path(root) / '.venv' / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
 
 
-def inspect_environment(root):
+def inspect_environment(root, ml=False):
     """用子进程检查解释器、锁定版本和实际导入，不修改文件。"""
     root = Path(root)
     python = environment_python(root)
@@ -23,9 +23,9 @@ def inspect_environment(root):
     if not python.is_file():
         result['problems'].append('项目虚拟环境缺失或解释器链接失效。')
         return result
-    lock = root / 'requirements-lock.txt'
+    lock = root / ('requirements-ml-lock.txt' if ml else 'requirements-lock.txt')
     if not lock.is_file():
-        result['problems'].append('缺少 requirements-lock.txt，无法核对依赖。')
+        result['problems'].append(f'缺少 {lock.name}，无法核对依赖。')
         return result
     requirements = {}
     for line in lock.read_text(encoding='utf-8').splitlines():
@@ -58,7 +58,7 @@ for name, expected in required.items():
             problems.append(name + ': ' + version + '，锁定版本 ' + expected)
     except importlib.metadata.PackageNotFoundError:
         problems.append('缺少依赖：' + name)
-for module in ['numpy', 'pandas', 'matplotlib', 'PIL']:
+for module in json.loads(sys.argv[3]):
     try:
         __import__(module)
     except Exception as error:
@@ -66,7 +66,9 @@ for module in ['numpy', 'pandas', 'matplotlib', 'PIL']:
 print(json.dumps({'python_version': sys.version.split()[0], 'is_project_venv': True, 'packages': packages, 'problems': problems}))
 '''
     try:
-        completed = subprocess.run([str(python), '-c', probe, json.dumps(requirements), str(root / '.venv')],
+        imports = ['numpy', 'pandas', 'matplotlib', 'PIL'] + (['sklearn', 'scipy'] if ml else [])
+        completed = subprocess.run([str(python), '-c', probe, json.dumps(requirements),
+                                    str(root / '.venv'), json.dumps(imports)],
                                    text=True, capture_output=True, timeout=90)
         if completed.returncode:
             result['problems'].append(completed.stderr.strip() or '解释器检查失败。')
@@ -94,10 +96,10 @@ def find_python312():
     raise RuntimeError('未找到可用 Python 3.12。请先安装 3.12，再运行配置；不会改动系统 Python。')
 
 
-def ensure_environment(root):
+def ensure_environment(root, ml=False):
     """健康环境直接复用；缺环境则创建，缺依赖则按锁文件安装。"""
     root = Path(root)
-    status = inspect_environment(root)
+    status = inspect_environment(root, ml=ml)
     if status['ready']:
         return status
     python = environment_python(root)
@@ -111,23 +113,25 @@ def ensure_environment(root):
     elif status.get('python_version', '').split('.')[:2] != ['3', '12']:
         raise RuntimeError('现有虚拟环境不是可用的 Python 3.12，请先改名保存 .venv，再配置。')
     print('按锁定版本安装项目依赖（需要网络）……', flush=True)
-    subprocess.run([str(python), '-m', 'pip', 'install', '-r', str(root / 'requirements-lock.txt')],
+    lock = root / ('requirements-ml-lock.txt' if ml else 'requirements-lock.txt')
+    subprocess.run([str(python), '-m', 'pip', 'install', '-r', str(lock)],
                    check=True, cwd=root)
-    status = inspect_environment(root)
+    status = inspect_environment(root, ml=ml)
     if not status['ready']:
         raise RuntimeError('安装后检查未通过：' + '；'.join(status['problems']))
     return status
 
 
 def main():
-    parser = argparse.ArgumentParser(description='自动配置项目独立 Python 环境')
+    parser = argparse.ArgumentParser(description='自动配置项目独立 Python 环境', allow_abbrev=False)
     parser.add_argument('--check', action='store_true', help='只检查，不安装或修改环境')
     parser.add_argument('--json', action='store_true', help='以 JSON 输出检查结果（与 --check 配合）')
+    parser.add_argument('--ml', action='store_true', help='同时配置/检查可选的基础分类实验依赖')
     args = parser.parse_args()
     if args.json and not args.check:
         parser.error('--json 需要同时指定 --check')
     try:
-        status = inspect_environment(PROJECT_DIR) if args.check else ensure_environment(PROJECT_DIR)
+        status = inspect_environment(PROJECT_DIR, ml=args.ml) if args.check else ensure_environment(PROJECT_DIR, ml=args.ml)
     except (OSError, RuntimeError, subprocess.SubprocessError, ValueError) as error:
         print('环境配置失败：' + str(error), file=sys.stderr)
         return 1
