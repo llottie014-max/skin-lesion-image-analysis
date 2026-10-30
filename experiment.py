@@ -215,7 +215,7 @@ def run_experiment(data_path, output_dir, evaluate_test=False, include_random_fo
              # 提醒后续实验不能反复根据test改参数。
              '不能根据test分数反复改特征或调参；增加方法时应预先确定协议。',
              # 保留数据来源和许可，方便作业引用。
-             '数据来源：MedMNIST / HAM10000，CC BY-NC 4.0，完整引用见项目DATA_SOURCE.md。', '']
+             '数据来源：MedMNIST / HAM10000，CC BY-NC 4.0，完整引用见项目数据说明.md。', '']
     # 启用森林时，在报告末尾补充RF实验说明。
     if forest is not None:
         # 写明森林的准确率选参和平局规则。

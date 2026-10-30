@@ -15,9 +15,9 @@ A beginner-friendly Python project for DermaMNIST image analysis, with an option
 
 项目通过 Python 脚本运行，结果保存为文件。
 
-新增进阶实验：24维可解释特征、精确像素重复审计、多数类对照与逻辑回归分类，按验证集选择参数。真实实验与局限见 [EXPERIMENTS.md](EXPERIMENTS.md)。
+新增进阶实验：24维可解释特征、精确像素重复审计、多数类对照与逻辑回归分类，按验证集选择参数。真实实验与局限见 [实验结果.md](实验结果.md)。
 
-随机森林改进：在相同特征和分区上，以验证集准确率选择随机森林参数，与两种原基线比较；结果与准确率/macro-F1取舍见 [RANDOM_FOREST.md](RANDOM_FOREST.md)。
+随机森林改进：在相同特征和分区上，以验证集准确率选择随机森林参数，与两种原基线比较；结果与准确率/macro-F1取舍见 [随机森林.md](随机森林.md)。
 
 ## 快速开始
 
@@ -110,14 +110,6 @@ macOS 也可双击 `配置环境.command` 和 `运行项目.command`；运行脚
 
 训练集复现计数（标签0～6）：228、359、769、80、779、4693、99。
 
-## 学习路线
-
-1. 阅读 [分步学习指南](LEARNING.md)，理解图像数组、统计和文件输出。
-2. 阅读 `main.py` 的三个运行选项。
-3. 阅读 `workflow.py` 的 `load_dataset`、`class_statistics`、`to_gray`，最后看 `run_analysis`。
-4. 按 [演示与练习](DEMO_WALKTHROUGH.md) 核对结果并独立修改。
-
-`bootstrap.py` 是环境辅助工具，可以稍后再读。
 
 ## 验证
 
@@ -132,7 +124,7 @@ macOS 也可双击 `配置环境.command` 和 `运行项目.command`；运行脚
 
 ## 来源与局限
 
-使用 [MedMNIST / DermaMNIST](https://github.com/MedMNIST/MedMNIST)，源数据为 HAM10000。数据许可为 CC BY-NC 4.0，引用见 [DATA_SOURCE.md](DATA_SOURCE.md)。仓库不包含原始数据或派生图片。
+使用 [MedMNIST / DermaMNIST](https://github.com/MedMNIST/MedMNIST)，源数据为 HAM10000。数据许可为 CC BY-NC 4.0，引用见 [数据说明.md](数据说明.md)。仓库不包含原始数据或派生图片。
 
 基础统计展示已有标签；分类实验将真实标签与模型预测分开保存。图像比例不是患者患病率。低分辨率、拍摄条件及已报告的同病灶跨划分问题限制模型结果的解释。
 
