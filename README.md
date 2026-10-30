@@ -15,9 +15,9 @@ A beginner-friendly Python project for DermaMNIST image analysis, with an option
 
 项目通过 Python 脚本运行，结果保存为文件。
 
-**新增进阶实验：**24维可解释特征、精确像素重复审计、多数类对照与逻辑回归分类，按验证集选择参数。真实实验与局限见 [EXPERIMENTS.md](EXPERIMENTS.md)。
+新增进阶实验：24维可解释特征、精确像素重复审计、多数类对照与逻辑回归分类，按验证集选择参数。真实实验与局限见 [EXPERIMENTS.md](EXPERIMENTS.md)。
 
-**随机森林改进：**在相同特征和分区上，以验证集准确率选择随机森林参数，与两种原基线比较；结果与准确率/macro-F1取舍见 [RANDOM_FOREST.md](RANDOM_FOREST.md)。
+随机森林改进：在相同特征和分区上，以验证集准确率选择随机森林参数，与两种原基线比较；结果与准确率/macro-F1取舍见 [RANDOM_FOREST.md](RANDOM_FOREST.md)。
 
 ## 快速开始
 
@@ -62,7 +62,7 @@ macOS 也可双击 `配置环境.command` 和 `运行项目.command`；运行脚
 .venv/bin/python train_baseline.py --offline
 ```
 
-默认输出 `outputs/baseline/validation/`，包含数据质量审计、候选参数分数、两种方法的验证集预测与指标、混淆矩阵、错误示例和完整配置。**默认不计算测试集预测或指标**；但会读取三个分区做精确重复和标签冲突审计。
+默认输出 `outputs/baseline/validation/`，包含数据质量审计、候选参数分数、两种方法的验证集预测与指标、混淆矩阵、错误示例和完整配置。默认不计算测试集预测或指标；但会读取三个分区做精确重复和标签冲突审计。
 
 确定特征和选参协议后，可以显式开启原官方测试集评估：
 
@@ -132,7 +132,7 @@ macOS 也可双击 `配置环境.command` 和 `运行项目.command`；运行脚
 
 ## 来源与局限
 
-使用 [MedMNIST / DermaMNIST](https://github.com/MedMNIST/MedMNIST)，源数据为 HAM10000。数据许可为 **CC BY-NC 4.0**，引用见 [DATA_SOURCE.md](DATA_SOURCE.md)。仓库不包含原始数据或派生图片。
+使用 [MedMNIST / DermaMNIST](https://github.com/MedMNIST/MedMNIST)，源数据为 HAM10000。数据许可为 CC BY-NC 4.0，引用见 [DATA_SOURCE.md](DATA_SOURCE.md)。仓库不包含原始数据或派生图片。
 
 基础统计展示已有标签；分类实验将真实标签与模型预测分开保存。图像比例不是患者患病率。低分辨率、拍摄条件及已报告的同病灶跨划分问题限制模型结果的解释。
 
