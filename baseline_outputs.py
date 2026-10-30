@@ -30,7 +30,7 @@ def save_evaluation(output_dir, split, model_name, truth, prediction):
     matrix = confusion_matrix(truth, prediction, labels=LABELS)
     pd.DataFrame(matrix, index=CLASS_SHORT, columns=CLASS_SHORT).to_csv(
         output_dir / f'{split}_{model_name}_confusion.csv', encoding='utf-8-sig', index_label='true_class')
-    if model_name == 'logistic':
+    if model_name in {'logistic', 'random_forest'}:
         support = matrix.sum(axis=1, keepdims=True)
         normalized = np.divide(matrix, support, out=np.zeros_like(matrix, dtype=float), where=support != 0)
         fig, axes = plt.subplots(1, 2, figsize=(13, 5.5), layout='constrained')
@@ -46,8 +46,10 @@ def save_evaluation(output_dir, split, model_name, truth, prediction):
                     threshold = 0.5 if normalized_flag else max(1, matrix.max()) / 2
                     ax.text(column, row, text, ha='center', va='center', fontsize=8,
                             color='white' if values[row, column] > threshold else '#172c27')
-        fig.suptitle(f'Logistic regression | {split} | n={len(truth)}')
-        save_figure(fig, output_dir / f'{split}_confusion_matrix.png', split)
+        title = 'Logistic regression' if model_name == 'logistic' else 'Random forest'
+        fig.suptitle(f'{title} | {split} | n={len(truth)}')
+        filename = f'{split}_confusion_matrix.png' if model_name == 'logistic' else f'{split}_random_forest_confusion_matrix.png'
+        save_figure(fig, output_dir / filename, split)
     return metrics
 
 
@@ -56,19 +58,22 @@ def save_comparison(output_dir, split, results):
     keys = ['accuracy', 'balanced_accuracy', 'macro_f1']
     fig, ax = plt.subplots(figsize=(9, 5), layout='constrained')
     x = np.arange(3)
-    for index, (name, color) in enumerate(zip(names, ['#8b9c96', '#237359'])):
+    width = 0.8 / len(names)
+    colors = ['#8b9c96', '#237359', '#497eaf']
+    for index, name in enumerate(names):
         values = [results[name][key] * 100 for key in keys]
-        bars = ax.bar(x + (index - 0.5) * 0.34, values, width=0.34, label=name, color=color)
+        bars = ax.bar(x + (index - (len(names) - 1) / 2) * width, values,
+                      width=width, label=name, color=colors[index % len(colors)])
         ax.bar_label(bars, fmt='%.1f', padding=3)
     ax.set(xticks=x, xticklabels=['Accuracy', 'Balanced accuracy', 'Macro-F1'],
-           ylim=(0, 100), ylabel='Score (%)', title=f'Majority guess vs learned features | {split}')
+           ylim=(0, 100), ylabel='Score (%)', title=f'Classification methods on the same features | {split}')
     ax.legend()
     ax.grid(axis='y', alpha=0.2)
     ax.set_axisbelow(True)
     save_figure(fig, Path(output_dir) / f'{split}_model_comparison.png', split)
 
 
-def save_validation_errors(output_dir, images, truth, prediction):
+def save_validation_errors(output_dir, images, truth, prediction, model_name='logistic'):
     """仅展示验证集按索引排序的前12个错误，不根据test挑例或改模型。"""
     indices = np.flatnonzero(truth != prediction)[:12]
     fig, axes = plt.subplots(3, 4, figsize=(10, 8), layout='constrained')
@@ -79,5 +84,19 @@ def save_validation_errors(output_dir, images, truth, prediction):
         ax.axis('off')
     if len(indices) == 0:
         axes[0, 0].text(0.5, 0.5, 'No validation errors', ha='center')
-    fig.suptitle('First validation errors by index (up to 12, not representative)')
-    save_figure(fig, Path(output_dir) / 'validation_error_examples.png', 'val')
+    fig.suptitle(f'{model_name}: first validation errors (up to 12, not representative)')
+    filename = 'validation_error_examples.png' if model_name == 'logistic' else f'validation_{model_name}_error_examples.png'
+    save_figure(fig, Path(output_dir) / filename, 'val')
+
+
+def save_forest_importance(output_dir, model, feature_names):
+    """不纯度重要性是模型描述，不代表因果或无偏的特征贡献。"""
+    output_dir = Path(output_dir)
+    table = pd.DataFrame({'feature': feature_names, 'impurity_importance': model.feature_importances_})
+    table = table.sort_values('impurity_importance', ascending=False, kind='stable')
+    table.to_csv(output_dir / 'random_forest_feature_importance.csv', index=False, encoding='utf-8-sig')
+    top = table.head(15).iloc[::-1]
+    fig, ax = plt.subplots(figsize=(9, 6), layout='constrained')
+    ax.barh(top['feature'], top['impurity_importance'], color='#497eaf')
+    ax.set(xlabel='Mean decrease in impurity', title='Random forest: top 15 impurity importances (not causal)')
+    save_figure(fig, output_dir / 'random_forest_feature_importance.png', 'train')

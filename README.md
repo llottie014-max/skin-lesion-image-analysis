@@ -17,6 +17,8 @@ A beginner-friendly Python project for DermaMNIST image analysis, with an option
 
 **新增进阶实验：**24维可解释特征、精确像素重复审计、多数类对照与逻辑回归分类，按验证集选择参数。真实实验与局限见 [EXPERIMENTS.md](EXPERIMENTS.md)。
 
+**随机森林改进：**在相同特征和分区上，以验证集准确率选择随机森林参数，与两种原基线比较；结果与准确率/macro-F1取舍见 [RANDOM_FOREST.md](RANDOM_FOREST.md)。
+
 ## 快速开始
 
 推荐 Python 3.12：
@@ -70,6 +72,18 @@ macOS 也可双击 `配置环境.command` 和 `运行项目.command`；运行脚
 
 输出到独立的 `outputs/baseline/test_evaluation/`。缩放器和模型只在 train 拟合，用 val 的 macro-F1 在 C=0.1/1/10 中选参数；不合并 train+val 重训，不根据 test 再调参。原数据有已报告的同病灶跨分区局限，所有指标仅用于原官方分区的教学对照。
 
+### 随机森林：以提高准确率为目标
+
+```bash
+.venv/bin/python train_baseline.py --offline --random-forest
+# 确定参数后再显式评估原官方test：
+.venv/bin/python train_baseline.py --offline --random-forest --evaluate-test
+```
+
+无需增加依赖。结果分别保存到 `outputs/random_forest/validation/` 和 `outputs/random_forest/test_evaluation/`。随机森林不需要标准化，仍使用相同24维特征；300棵树、固定种子42、两个CPU线程，在8个预先固定候选中按val accuracy选择参数。LR原来的macro-F1选择目标不变，因此不能把两种模型说成优化同一指标。
+
+新增三模型对比图、RF预测/分类报告/混淆矩阵、验证集错误例、完整候选和不纯度特征重要性。重要性不代表因果解释。测试集在前轮已经查看，本轮是同分区的探索性比较，不是全新独立验证。
+
 ## 数据与输出
 
 | 分区 | 图像数 | 单张图像形状 |
@@ -122,6 +136,6 @@ macOS 也可双击 `配置环境.command` 和 `运行项目.command`；运行脚
 
 基础统计展示已有标签；分类实验将真实标签与模型预测分开保存。图像比例不是患者患病率。低分辨率、拍摄条件及已报告的同病灶跨划分问题限制模型结果的解释。
 
-当前已完成图像分析和可选的逻辑回归教学基线，尚未训练深度学习模型。进一步研究前需取得病灶身份映射并使用合理的分组划分；像素哈希检查不能替代这一工作。
+当前已完成图像分析、逻辑回归与随机森林教学对照，尚未训练深度学习模型。进一步研究前需取得病灶身份映射并使用合理的分组划分；像素哈希检查不能替代这一工作。
 
 代码尚未指定开源许可证，数据许可与代码权利分开处理。

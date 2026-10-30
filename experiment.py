@@ -9,14 +9,14 @@ import numpy as np
 import pandas as pd
 from sklearn.dummy import DummyClassifier
 
-from baseline import C_GRID, select_model
-from baseline_outputs import save_comparison, save_evaluation, save_validation_errors
+from baseline import C_GRID, select_model, select_random_forest
+from baseline_outputs import save_comparison, save_evaluation, save_validation_errors, save_forest_importance
 from features import FEATURE_NAMES, extract_features
 from quality import audit_splits
 from workflow import DATA_MD5, DATA_URL, SPLIT_COUNTS, check_md5, configure_font, load_dataset
 
 
-def run_experiment(data_path, output_dir, evaluate_test=False):
+def run_experiment(data_path, output_dir, evaluate_test=False, include_random_forest=False):
     """保留官方标签与划分；审计只报告问题，不悄悄清理数据。"""
     check_md5(data_path, DATA_MD5)
     splits = {name: load_dataset(data_path, name) for name in SPLIT_COUNTS}
@@ -37,12 +37,23 @@ def run_experiment(data_path, output_dir, evaluate_test=False):
     y_val = splits['val'][1]
     model, chosen_c, candidates = select_model(x_train, y_train, x_val, y_val)
     dummy = DummyClassifier(strategy='most_frequent').fit(x_train, y_train)
+    forest, forest_parameters, forest_candidates = None, None, []
+    if include_random_forest:
+        print('  随机森林：8个预先固定的候选，仅按val accuracy选参……', flush=True)
+        forest, forest_parameters, forest_candidates = select_random_forest(
+            x_train, y_train, x_val, y_val, verbose=True)
     print(f'[3/4] 按val macro-F1选择 C={chosen_c}，保存验证集评估……', flush=True)
     val_predictions = model.predict(x_val)
     metrics = {'val': {
         'majority': save_evaluation(output_dir, 'val', 'majority', y_val, dummy.predict(x_val)),
         'logistic': save_evaluation(output_dir, 'val', 'logistic', y_val, val_predictions),
     }}
+    if forest is not None:
+        forest_predictions = forest.predict(x_val)
+        metrics['val']['random_forest'] = save_evaluation(output_dir, 'val', 'random_forest', y_val, forest_predictions)
+        save_validation_errors(output_dir, splits['val'][0], y_val, forest_predictions, 'random_forest')
+        save_forest_importance(output_dir, forest, FEATURE_NAMES)
+        pd.DataFrame(forest_candidates).to_csv(output_dir / 'random_forest_candidates.csv', index=False, encoding='utf-8-sig')
     save_comparison(output_dir, 'val', metrics['val'])
     save_validation_errors(output_dir, splits['val'][0], y_val, val_predictions)
     if evaluate_test:
@@ -54,6 +65,8 @@ def run_experiment(data_path, output_dir, evaluate_test=False):
             'majority': save_evaluation(output_dir, 'test', 'majority', y_test, dummy.predict(x_test)),
             'logistic': save_evaluation(output_dir, 'test', 'logistic', y_test, model.predict(x_test)),
         }
+        if forest is not None:
+            metrics['test']['random_forest'] = save_evaluation(output_dir, 'test', 'random_forest', y_test, forest.predict(x_test))
         save_comparison(output_dir, 'test', metrics['test'])
     pd.DataFrame(candidates).to_csv(output_dir / 'validation_candidates.csv', index=False, encoding='utf-8-sig')
     pd.DataFrame(model.named_steps['classifier'].coef_, columns=FEATURE_NAMES,
@@ -79,6 +92,14 @@ def run_experiment(data_path, output_dir, evaluate_test=False):
         'versions': {name: importlib.metadata.version(name) for name in ['numpy', 'pandas', 'Pillow', 'scikit-learn', 'scipy', 'matplotlib']},
         'quality_summary': {key: quality[key] for key in ['cross_split_shared_groups', 'conflicting_label_groups', 'within_split']},
     }
+    if forest is not None:
+        summary['random_forest'] = {
+            'parameters': forest_parameters,
+            'validation_candidates': forest_candidates,
+            'selection_rule': 'maximum validation accuracy; ties: macro-F1, balanced accuracy, then predefined candidate order; train-only fitting without scaling',
+            'importance_note': 'Impurity importance can be biased and is not a causal or clinical explanation.',
+            'evaluation_note': 'Original official test was examined in earlier baseline experiments; this is a same-split exploratory comparison, not a new independent holdout.',
+        }
     (output_dir / 'experiment.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     rows = ['# 教学分类基线结果', '',
             '本结果使用原官方分区，存在已报告的同病灶跨集合局限；像素级重复检查不等于病灶级去重。', '',
@@ -92,6 +113,10 @@ def run_experiment(data_path, output_dir, evaluate_test=False):
              '错误示例仅取验证集按编号排序的前12个错误，不代表总体错误分布。',
              '不能根据test分数反复改特征或调参；增加方法时应预先确定协议。',
              '数据来源：MedMNIST / HAM10000，CC BY-NC 4.0，完整引用见项目DATA_SOURCE.md。', '']
+    if forest is not None:
+        rows += ['随机森林按val accuracy选参；平局依次比较macro-F1、balanced accuracy和固定候选顺序。',
+                 '候选见random_forest_candidates.csv；不纯度特征重要性不是因果解释。',
+                 'test已在前轮基线实验查看，本次是相同原分区的探索对比，不是全新独立验证。', '']
     (output_dir / 'results.md').write_text('\n'.join(rows), encoding='utf-8')
     print(f'[4/4] 实验完成：{output_dir}', flush=True)
     return summary

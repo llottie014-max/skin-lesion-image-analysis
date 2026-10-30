@@ -3,6 +3,7 @@ import warnings
 
 import numpy as np
 from sklearn.exceptions import ConvergenceWarning
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, f1_score
 from sklearn.pipeline import Pipeline
@@ -11,6 +12,10 @@ from sklearn.preprocessing import StandardScaler
 
 LABELS = list(range(7))
 C_GRID = (0.1, 1.0, 10.0)
+RF_GRID = tuple(
+    {'max_depth': depth, 'min_samples_leaf': leaf, 'class_weight': weight}
+    for depth in (12, None) for leaf in (3, 1) for weight in (None, 'balanced_subsample')
+)
 
 
 def evaluate_predictions(y_true, y_pred):
@@ -55,3 +60,28 @@ def select_model(x_train, y_train, x_val, y_val, candidates=C_GRID):
             best_score = metrics['macro_f1']
             best_model, chosen = model, value
     return best_model, chosen, scores
+
+
+def select_random_forest(x_train, y_train, x_val, y_val, candidates=RF_GRID,
+                         n_estimators=300, verbose=False):
+    """仅train拟合，按val accuracy选RF；平局比较macro-F1、balanced accuracy。"""
+    best_model, selected, best_rank = None, None, None
+    scores = []
+    for index, candidate in enumerate(candidates):
+        if set(candidate) != {'max_depth', 'min_samples_leaf', 'class_weight'}:
+            raise ValueError('RF候选仅允许max_depth、min_samples_leaf、class_weight。')
+        parameters = {'n_estimators': n_estimators, 'max_features': 'sqrt',
+                      'random_state': 42, 'n_jobs': 2, 'bootstrap': True, **candidate}
+        model = RandomForestClassifier(**parameters).fit(x_train, y_train)
+        metrics = evaluate_predictions(y_val, model.predict(x_val))
+        scores.append({'candidate_index': index, **parameters, **metrics})
+        rank = (metrics['accuracy'], metrics['macro_f1'], metrics['balanced_accuracy'])
+        if best_rank is None or rank > best_rank:
+            best_model, selected, best_rank = model, parameters, rank
+        if verbose:
+            print(f'  RF候选{index + 1}: depth={candidate["max_depth"]}, '
+                  f'leaf={candidate["min_samples_leaf"]}, weight={candidate["class_weight"]}, '
+                  f'val accuracy={metrics["accuracy"]:.4f}, macro-F1={metrics["macro_f1"]:.4f}', flush=True)
+    if best_model is None:
+        raise ValueError('RF候选列表不能为空。')
+    return best_model, selected, scores
